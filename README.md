@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧭 DevelopWave Admin Dashboard
 
-## Getting Started
+Un **dashboard administrativo moderno y modular**, desarrollado con **Next.js 16** y **shadcn/ui**, diseñado para centralizar la gestión interna de **proyectos, clientes, finanzas y empleados** de DevelopWave.
 
-First, run the development server:
+Este panel tiene como objetivo optimizar la organización, seguimiento y control de los distintos procesos de la empresa, desde la captación de clientes hasta la facturación final.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Tecnologías principales
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Next.js 16** — Framework de React de alto rendimiento.
+- **TypeScript** — Tipado estático para mayor robustez y mantenibilidad.
+- **shadcn/ui** — Biblioteca de componentes UI elegantes y accesibles.
+- **Tailwind CSS** — Sistema de estilos rápido y personalizable.
+- **React Query / Zustand** — Para manejo de estado y datos asíncronos (opcional según backend).
+- **Próximamente:** Integración con API/Backend personalizado (NestJS, Express, Supabase, etc).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🧩 Características principales
 
-To learn more about Next.js, take a look at the following resources:
+### 👥 Módulo de Clientes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Gestiona todos los clientes de DevelopWave en un solo lugar.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Crear, editar y eliminar clientes.
+- Asignar **estatus** (Lead, Activo, Inactivo, Finalizado, etc.).
+- Relacionar **proyectos asociados** a cada cliente.
+- Ver histórico de interacciones y notas internas.
+- Subir y vincular **documentos, enlaces o cotizaciones.**
 
-## Deploy on Vercel
+### 🧱 Módulo de Proyectos
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Administra los proyectos desde su inicio hasta su cierre.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Crear proyectos vinculados a un cliente.
+- Definir **precio total** y **forma de pago** (por hitos, mensualidades, pago único, etc.).
+- Agregar **links de trabajo, documentación, entregas, repositorios, demos, etc.**
+- Seguimiento por **estatus**: planeación, desarrollo, revisión, completado, en pausa.
+- Conectar los datos con el módulo de **Finanzas** para control automático de pagos.
+- Asignar **empleados** responsables o colaboradores.
+
+### 💰 Módulo de Finanzas
+
+Controla las finanzas de la empresa de forma clara y organizada.
+
+- Registro de **pagos**, **ingresos** y **gastos**.
+- Creación y gestión de **facturas (invoices)** y **cotizaciones.**
+- Vinculación directa con los **proyectos activos.**
+- Estado financiero general y por cliente/proyecto.
+- Dashboard visual con métricas clave (ingresos mensuales, pagos pendientes, gastos, etc).
+
+### 🧑‍💼 Módulo de Empleados
+
+Mantén organizada toda la información del equipo de trabajo.
+
+- Listado de empleados activos.
+- Asignación de roles y permisos (Administrador, Finanzas, Desarrollador, Soporte, etc).
+- Vinculación de cada empleado con los proyectos en los que participa.
+- Información de contacto, estado laboral, historial de participación.
+- Posible integración futura con control de horas o productividad.
+
+---
+
+## 🧠 Flujo General de Datos
+
+1. **Clientes** → pueden tener varios **Proyectos**.
+2. Cada **Proyecto** → tiene su **estatus**, **precio**, **forma de pago**, **cotización** y **empleados asignados**.
+3. Los **Pagos** → se registran automáticamente en el módulo de **Finanzas**, enlazados al proyecto y cliente correspondiente.
+4. Los **Empleados** → se asocian a uno o más proyectos, con visibilidad de su participación y desempeño.
+5. El panel mostrará **dashboards visuales** con datos agregados (rendimiento, ingresos, clientes activos, etc).
+
+---
