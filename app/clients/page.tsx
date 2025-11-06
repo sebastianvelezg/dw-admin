@@ -64,12 +64,11 @@ import { EmptyState } from "@/components/empty-state"
 import { TableSkeleton } from "@/components/skeletons/table-skeleton"
 
 export default function ClientsPage() {
-  const { clients, addClient, updateClient, deleteClient } = useClientStore()
+  const { clients, addClient, updateClient, deleteClient, fetchClients, loading, initialized } = useClientStore()
   const [searchQuery, setSearchQuery] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false)
   const [editingClient, setEditingClient] = React.useState<Client | null>(null)
-  const [isLoading, setIsLoading] = React.useState(true)
 
   // Form state
   const [formData, setFormData] = React.useState({
@@ -85,11 +84,12 @@ export default function ClientsPage() {
     revenue: 0,
   })
 
-  // Simulate loading
+  // Fetch clients on mount
   React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500)
-    return () => clearTimeout(timer)
-  }, [])
+    if (!initialized) {
+      fetchClients()
+    }
+  }, [initialized, fetchClients])
 
   const filteredClients = clients.filter((client) => {
     const matchesSearch =
@@ -117,23 +117,29 @@ export default function ClientsPage() {
     setEditingClient(null)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (editingClient) {
-      updateClient(editingClient.id, formData)
-      toast.success("Cliente actualizado", {
-        description: `${formData.name} ha sido actualizado exitosamente.`,
-      })
-    } else {
-      addClient(formData)
-      toast.success("Cliente creado", {
-        description: `${formData.name} ha sido agregado exitosamente.`,
+    try {
+      if (editingClient) {
+        await updateClient(editingClient.id, formData)
+        toast.success("Cliente actualizado", {
+          description: `${formData.name} ha sido actualizado exitosamente.`,
+        })
+      } else {
+        await addClient(formData)
+        toast.success("Cliente creado", {
+          description: `${formData.name} ha sido agregado exitosamente.`,
+        })
+      }
+
+      setIsAddDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      toast.error("Error", {
+        description: editingClient ? "No se pudo actualizar el cliente" : "No se pudo crear el cliente"
       })
     }
-
-    setIsAddDialogOpen(false)
-    resetForm()
   }
 
   const handleEdit = (client: Client) => {
@@ -153,12 +159,18 @@ export default function ClientsPage() {
     setIsAddDialogOpen(true)
   }
 
-  const handleDelete = (client: Client) => {
+  const handleDelete = async (client: Client) => {
     if (confirm(`¿Estás seguro de eliminar a ${client.name}?`)) {
-      deleteClient(client.id)
-      toast.success("Cliente eliminado", {
-        description: `${client.name} ha sido eliminado.`,
-      })
+      try {
+        await deleteClient(client.id)
+        toast.success("Cliente eliminado", {
+          description: `${client.name} ha sido eliminado.`,
+        })
+      } catch (error) {
+        toast.error("Error", {
+          description: "No se pudo eliminar el cliente"
+        })
+      }
     }
   }
 
@@ -196,7 +208,7 @@ export default function ClientsPage() {
     }
   }
 
-  if (isLoading) {
+  if (loading && !initialized) {
     return (
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">

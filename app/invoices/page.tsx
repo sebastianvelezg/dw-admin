@@ -68,8 +68,8 @@ import { exportToCSV, formatDateForExport } from "@/lib/export-utils"
 import { EmptyState } from "@/components/empty-state"
 
 export default function InvoicesPage() {
-  const { invoices, addInvoice, updateInvoice, deleteInvoice, markAsPaid } = useInvoiceStore()
-  const { clients } = useClientStore()
+  const { invoices, addInvoice, updateInvoice, deleteInvoice, markAsPaid, fetchInvoices, loading, initialized } = useInvoiceStore()
+  const { clients, fetchClients } = useClientStore()
   const [searchQuery, setSearchQuery] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -77,6 +77,17 @@ export default function InvoicesPage() {
   const [emailInvoice, setEmailInvoice] = React.useState<Invoice | null>(null)
   const [emailForm, setEmailForm] = React.useState({ to: "", cc: "", subject: "", message: "" })
   const invoiceTemplateRef = React.useRef<HTMLDivElement>(null)
+
+  // Fetch data on mount
+  React.useEffect(() => {
+    if (!initialized) {
+      fetchInvoices()
+    }
+  }, [initialized, fetchInvoices])
+
+  React.useEffect(() => {
+    fetchClients()
+  }, [fetchClients])
 
   // Form state
   const [formData, setFormData] = React.useState({
@@ -180,16 +191,20 @@ export default function InvoicesPage() {
     })
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.clientId || formData.items.length === 0 || !formData.issueDate || !formData.dueDate) {
       toast.error("Completa todos los campos requeridos")
       return
     }
 
-    addInvoice(formData)
-    toast.success("Factura creada exitosamente")
-    setIsDialogOpen(false)
-    resetForm()
+    try {
+      await addInvoice(formData)
+      toast.success("Factura creada exitosamente")
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      toast.error("Error al crear la factura")
+    }
   }
 
   const resetForm = () => {
@@ -654,9 +669,13 @@ export default function InvoicesPage() {
                               {invoice.status !== "Pagada" && (
                                 <>
                                   <DropdownMenuItem
-                                    onClick={() => {
-                                      markAsPaid(invoice.id)
-                                      toast.success("Factura marcada como pagada")
+                                    onClick={async () => {
+                                      try {
+                                        await markAsPaid(invoice.id)
+                                        toast.success("Factura marcada como pagada")
+                                      } catch (error) {
+                                        toast.error("Error al marcar como pagada")
+                                      }
                                     }}
                                   >
                                     <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -667,10 +686,14 @@ export default function InvoicesPage() {
                               )}
                               <DropdownMenuItem
                                 className="text-destructive"
-                                onClick={() => {
+                                onClick={async () => {
                                   if (confirm("¿Eliminar esta factura?")) {
-                                    deleteInvoice(invoice.id)
-                                    toast.success("Factura eliminada")
+                                    try {
+                                      await deleteInvoice(invoice.id)
+                                      toast.success("Factura eliminada")
+                                    } catch (error) {
+                                      toast.error("Error al eliminar la factura")
+                                    }
                                   }
                                 }}
                               >
