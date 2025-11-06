@@ -69,9 +69,10 @@ import { useTaskStore, type Task } from "@/lib/stores/task-store"
 import { useMeetingStore, type Meeting } from "@/lib/stores/meeting-store"
 import { useLinkStore, type ProjectLink } from "@/lib/stores/link-store"
 
-export default function ProjectDetailPage({ params }: { params: { id: string } }) {
+export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const projectId = parseInt(params.id)
+  const unwrappedParams = React.use(params)
+  const projectId = parseInt(unwrappedParams.id)
 
   const { getProjectById } = useProjectStore()
   const { clients } = useClientStore()
