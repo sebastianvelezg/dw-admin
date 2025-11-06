@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   Plus,
   Calendar,
@@ -312,12 +313,13 @@ export default function ProjectsPage() {
                 <ScrollArea className="h-[600px] pr-4">
                   <div className="space-y-3">
                     {statusProjects.map((project) => (
-                      <Card key={project.id} className="border-2">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between">
-                            <CardTitle className="text-sm font-medium leading-tight">
-                              {project.title}
-                            </CardTitle>
+                      <Card key={project.id} className="border-2 hover:border-primary/50 transition-colors cursor-pointer">
+                        <Link href={`/projects/${project.id}`}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <CardTitle className="text-sm font-medium leading-tight hover:text-primary">
+                                {project.title}
+                              </CardTitle>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -384,6 +386,7 @@ export default function ProjectsPage() {
                             </div>
                           </div>
                         </CardContent>
+                        </Link>
                       </Card>
                     ))}
                   </div>
@@ -404,14 +407,15 @@ export default function ProjectsPage() {
           <CardContent>
             <div className="space-y-3">
               {projects.map((project) => (
-                <Card key={project.id} className="border-2">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <CardTitle className="text-base">
-                            {project.title}
-                          </CardTitle>
+                <Card key={project.id} className="border-2 hover:border-primary/50 transition-colors cursor-pointer">
+                  <Link href={`/projects/${project.id}`}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <CardTitle className="text-base hover:text-primary">
+                              {project.title}
+                            </CardTitle>
                           <Badge variant={statusColors[project.status as keyof typeof statusColors]}>
                             {project.status}
                           </Badge>
@@ -482,6 +486,7 @@ export default function ProjectsPage() {
                       <Progress value={project.progress} />
                     </div>
                   </CardContent>
+                  </Link>
                 </Card>
               ))}
             </div>
