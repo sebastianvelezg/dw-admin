@@ -8,7 +8,7 @@ export type Client = {
   email: string
   phone: string
   company: string
-  status: 'Activo' | 'Lead' | 'Inactivo' | 'Prospecto'
+  status: 'Activo' | 'Inactivo' | 'Prospecto'
   projects: number
   revenue: number
   location: string
@@ -27,8 +27,6 @@ type ClientStore = {
   getClientById: (id: number) => Client | undefined
 }
 
-const supabase = createClient()
-
 export const useClientStore = create<ClientStore>((set, get) => ({
   clients: [],
   loading: false,
@@ -37,6 +35,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
   fetchClients: async () => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -44,37 +43,57 @@ export const useClientStore = create<ClientStore>((set, get) => ({
         return
       }
 
-      const { data, error } = await supabase
+      // Fetch clients
+      const { data: clientsData, error: clientsError } = await supabase
         .from('clients')
-        .select(`
-          id,
-          name,
-          email,
-          phone,
-          company,
-          address,
-          city,
-          country,
-          status,
-          notes,
-          created_at,
-          projects:projects(count)
-        `)
+        .select('id, name, email, phone, company, address, city, country, status, notes, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (clientsError) {
+        console.error('Error fetching clients:', {
+          message: clientsError.message,
+          details: clientsError.details,
+          hint: clientsError.hint,
+          code: clientsError.code
+        })
+        throw clientsError
+      }
+
+      // Fetch project counts for each client
+      const { data: projectCounts, error: projectError } = await supabase
+        .from('projects')
+        .select('client_id')
+        .eq('user_id', user.id)
+
+      if (projectError) {
+        console.error('Error fetching project counts:', {
+          message: projectError.message,
+          details: projectError.details,
+          hint: projectError.hint,
+          code: projectError.code
+        })
+      }
+
+      // Create a map of client_id to project count
+      const projectCountMap = new Map<number, number>()
+      if (projectCounts) {
+        projectCounts.forEach((project: any) => {
+          const count = projectCountMap.get(project.client_id) || 0
+          projectCountMap.set(project.client_id, count + 1)
+        })
+      }
 
       // Map database fields to Client type
-      const clients: Client[] = (data || []).map((client: any) => ({
+      const clients: Client[] = (clientsData || []).map((client: any) => ({
         id: client.id,
         name: client.name,
         contact: client.name, // Using name as contact for now
         email: client.email,
         phone: client.phone || '',
         company: client.company || '',
-        status: client.status as 'Activo' | 'Lead' | 'Inactivo' | 'Prospecto',
-        projects: Array.isArray(client.projects) ? client.projects.length : 0,
+        status: client.status as 'Activo' | 'Inactivo' | 'Prospecto',
+        projects: projectCountMap.get(client.id) || 0,
         revenue: 0, // Will be calculated from projects
         location: client.city && client.country ? `${client.city}, ${client.country}` : client.city || client.country || '',
         notes: client.notes || '',
@@ -82,8 +101,12 @@ export const useClientStore = create<ClientStore>((set, get) => ({
       }))
 
       set({ clients, loading: false, initialized: true })
-    } catch (error) {
-      console.error('Error fetching clients:', error)
+    } catch (error: any) {
+      console.error('Error fetching clients:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false, initialized: true })
     }
   },
@@ -91,6 +114,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
   addClient: async (client) => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
@@ -116,7 +140,15 @@ export const useClientStore = create<ClientStore>((set, get) => ({
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error adding client:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
 
       // Add to local state
       const newClient: Client = {
@@ -126,7 +158,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
         email: data.email,
         phone: data.phone || '',
         company: data.company || '',
-        status: data.status as 'Activo' | 'Lead' | 'Inactivo' | 'Prospecto',
+        status: data.status as 'Activo' | 'Inactivo' | 'Prospecto',
         projects: 0,
         revenue: 0,
         location: data.city && data.country ? `${data.city}, ${data.country}` : data.city || data.country || '',
@@ -138,8 +170,12 @@ export const useClientStore = create<ClientStore>((set, get) => ({
         clients: [newClient, ...state.clients],
         loading: false
       }))
-    } catch (error) {
-      console.error('Error adding client:', error)
+    } catch (error: any) {
+      console.error('Error adding client:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false })
       throw error
     }
@@ -148,6 +184,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
   updateClient: async (id, updatedClient) => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
@@ -176,7 +213,15 @@ export const useClientStore = create<ClientStore>((set, get) => ({
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error updating client:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
 
       // Update local state
       set((state) => ({
@@ -197,8 +242,12 @@ export const useClientStore = create<ClientStore>((set, get) => ({
         ),
         loading: false
       }))
-    } catch (error) {
-      console.error('Error updating client:', error)
+    } catch (error: any) {
+      console.error('Error updating client:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false })
       throw error
     }
@@ -207,6 +256,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
   deleteClient: async (id) => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
@@ -217,14 +267,26 @@ export const useClientStore = create<ClientStore>((set, get) => ({
         .eq('id', id)
         .eq('user_id', user.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('Error deleting client:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
 
       set((state) => ({
         clients: state.clients.filter((client) => client.id !== id),
         loading: false
       }))
-    } catch (error) {
-      console.error('Error deleting client:', error)
+    } catch (error: any) {
+      console.error('Error deleting client:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false })
       throw error
     }
