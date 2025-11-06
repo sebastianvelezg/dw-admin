@@ -10,7 +10,9 @@ import {
   MoreHorizontal,
   LayoutList,
   LayoutGrid,
+  FolderKanban,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -52,76 +54,10 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
-// Mock data
-const projects = [
-  {
-    id: 1,
-    title: "E-commerce Platform",
-    client: "TechCorp",
-    status: "En progreso",
-    progress: 75,
-    budget: 45000,
-    deadline: "2024-12-15",
-    team: 4,
-    description: "Plataforma completa de e-commerce con integración de pagos",
-  },
-  {
-    id: 2,
-    title: "Mobile App Redesign",
-    client: "StartupXYZ",
-    status: "Planeación",
-    progress: 25,
-    budget: 30000,
-    deadline: "2024-12-30",
-    team: 3,
-    description: "Rediseño completo de aplicación móvil iOS y Android",
-  },
-  {
-    id: 3,
-    title: "Corporate Website",
-    client: "BigCo",
-    status: "Completado",
-    progress: 100,
-    budget: 15000,
-    deadline: "2024-11-20",
-    team: 2,
-    description: "Sitio web corporativo con CMS",
-  },
-  {
-    id: 4,
-    title: "API Integration",
-    client: "DevServices",
-    status: "En progreso",
-    progress: 60,
-    budget: 20000,
-    deadline: "2024-12-10",
-    team: 5,
-    description: "Integración de APIs de terceros",
-  },
-  {
-    id: 5,
-    title: "Dashboard Analytics",
-    client: "Digital Ventures",
-    status: "Planeación",
-    progress: 15,
-    budget: 35000,
-    deadline: "2025-01-15",
-    team: 3,
-    description: "Dashboard de analytics en tiempo real",
-  },
-  {
-    id: 6,
-    title: "CRM System",
-    client: "TechCorp",
-    status: "En revisión",
-    progress: 85,
-    budget: 55000,
-    deadline: "2024-11-30",
-    team: 6,
-    description: "Sistema CRM personalizado",
-  },
-]
+import { useProjectStore, type Project, type ProjectStatus } from "@/lib/stores/project-store"
+import { useClientStore } from "@/lib/stores/client-store"
+import { EmptyState } from "@/components/empty-state"
+import { TableSkeleton } from "@/components/skeletons/table-skeleton"
 
 const statusColors = {
   Planeación: "outline",
@@ -131,16 +67,121 @@ const statusColors = {
   "En pausa": "outline",
 }
 
-const statusGroups = {
-  Planeación: projects.filter((p) => p.status === "Planeación"),
-  "En progreso": projects.filter((p) => p.status === "En progreso"),
-  "En revisión": projects.filter((p) => p.status === "En revisión"),
-  Completado: projects.filter((p) => p.status === "Completado"),
-}
-
 export default function ProjectsPage() {
+  const {
+    projects,
+    fetchProjects,
+    addProject,
+    updateProject,
+    deleteProject,
+    loading,
+    initialized
+  } = useProjectStore()
+  const { clients, fetchClients, initialized: clientsInitialized } = useClientStore()
   const [view, setView] = React.useState<"kanban" | "list">("kanban")
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false)
+
+  // Form state
+  const [formData, setFormData] = React.useState({
+    title: "",
+    clientId: 0,
+    status: "Planeación" as ProjectStatus,
+    priority: "Media" as "Baja" | "Media" | "Alta",
+    category: "",
+    startDate: "",
+    deadline: "",
+    budget: 0,
+    spent: 0,
+    progress: 0,
+    description: "",
+  })
+
+  // Fetch data on mount
+  React.useEffect(() => {
+    if (!initialized) {
+      fetchProjects()
+    }
+  }, [initialized, fetchProjects])
+
+  React.useEffect(() => {
+    if (!clientsInitialized) {
+      fetchClients()
+    }
+  }, [clientsInitialized, fetchClients])
+
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      clientId: 0,
+      status: "Planeación",
+      priority: "Media",
+      category: "",
+      startDate: "",
+      deadline: "",
+      budget: 0,
+      spent: 0,
+      progress: 0,
+      description: "",
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!formData.clientId) {
+      toast.error("Error", {
+        description: "Por favor selecciona un cliente"
+      })
+      return
+    }
+
+    try {
+      await addProject(formData)
+      toast.success("Proyecto creado", {
+        description: `${formData.title} ha sido creado exitosamente.`,
+      })
+      setIsAddDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      toast.error("Error", {
+        description: "No se pudo crear el proyecto"
+      })
+    }
+  }
+
+  const handleDelete = async (project: Project) => {
+    if (confirm(`¿Estás seguro de eliminar ${project.title}?`)) {
+      try {
+        await deleteProject(project.id)
+        toast.success("Proyecto eliminado", {
+          description: `${project.title} ha sido eliminado.`,
+        })
+      } catch (error) {
+        toast.error("Error", {
+          description: "No se pudo eliminar el proyecto"
+        })
+      }
+    }
+  }
+
+  const statusGroups = {
+    Planeación: projects.filter((p) => p.status === "Planeación"),
+    "En progreso": projects.filter((p) => p.status === "En progreso"),
+    "En revisión": projects.filter((p) => p.status === "En revisión"),
+    Completado: projects.filter((p) => p.status === "Completado"),
+  }
+
+  if (loading && !initialized) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <div className="h-9 w-48 bg-muted animate-pulse rounded" />
+          <div className="h-5 w-96 bg-muted animate-pulse rounded" />
+        </div>
+        <TableSkeleton rows={8} />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -165,7 +206,10 @@ export default function ProjectsPage() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            setIsAddDialogOpen(open)
+            if (!open) resetForm()
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -173,76 +217,166 @@ export default function ProjectsPage() {
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
-                <DialogDescription>
-                  Ingresa los detalles del proyecto
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="title">Nombre del Proyecto</Label>
-                  <Input id="title" placeholder="E-commerce Platform" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit}>
+                <DialogHeader>
+                  <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
+                  <DialogDescription>
+                    Ingresa los detalles del proyecto
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="client">Cliente</Label>
-                    <Select>
-                      <SelectTrigger id="client">
-                        <SelectValue placeholder="Selecciona un cliente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="techcorp">TechCorp</SelectItem>
-                        <SelectItem value="startupxyz">StartupXYZ</SelectItem>
-                        <SelectItem value="bigco">BigCo</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="title">Nombre del Proyecto</Label>
+                    <Input
+                      id="title"
+                      required
+                      value={formData.title}
+                      onChange={(e) =>
+                        setFormData({ ...formData, title: e.target.value })
+                      }
+                      placeholder="E-commerce Platform"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="client">Cliente</Label>
+                      <Select
+                        value={formData.clientId.toString()}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, clientId: parseInt(value) })
+                        }
+                      >
+                        <SelectTrigger id="client">
+                          <SelectValue placeholder="Selecciona un cliente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((client) => (
+                            <SelectItem key={client.id} value={client.id.toString()}>
+                              {client.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="status">Estado</Label>
+                      <Select
+                        value={formData.status}
+                        onValueChange={(value: ProjectStatus) =>
+                          setFormData({ ...formData, status: value })
+                        }
+                      >
+                        <SelectTrigger id="status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Planeación">Planeación</SelectItem>
+                          <SelectItem value="En progreso">En progreso</SelectItem>
+                          <SelectItem value="En revisión">En revisión</SelectItem>
+                          <SelectItem value="Completado">Completado</SelectItem>
+                          <SelectItem value="En pausa">En pausa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="budget">Presupuesto</Label>
+                      <Input
+                        id="budget"
+                        type="number"
+                        required
+                        value={formData.budget || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, budget: parseFloat(e.target.value) || 0 })
+                        }
+                        placeholder="45000"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="priority">Prioridad</Label>
+                      <Select
+                        value={formData.priority}
+                        onValueChange={(value: "Baja" | "Media" | "Alta") =>
+                          setFormData({ ...formData, priority: value })
+                        }
+                      >
+                        <SelectTrigger id="priority">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Baja">Baja</SelectItem>
+                          <SelectItem value="Media">Media</SelectItem>
+                          <SelectItem value="Alta">Alta</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="startDate">Fecha de Inicio</Label>
+                      <Input
+                        id="startDate"
+                        type="date"
+                        required
+                        value={formData.startDate}
+                        onChange={(e) =>
+                          setFormData({ ...formData, startDate: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="deadline">Fecha límite</Label>
+                      <Input
+                        id="deadline"
+                        type="date"
+                        value={formData.deadline}
+                        onChange={(e) =>
+                          setFormData({ ...formData, deadline: e.target.value })
+                        }
+                      />
+                    </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="status">Estado</Label>
-                    <Select defaultValue="planeacion">
-                      <SelectTrigger id="status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="planeacion">Planeación</SelectItem>
-                        <SelectItem value="progreso">En progreso</SelectItem>
-                        <SelectItem value="revision">En revisión</SelectItem>
-                        <SelectItem value="completado">Completado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="budget">Presupuesto</Label>
-                    <Input id="budget" type="number" placeholder="45000" />
+                    <Label htmlFor="category">Categoría (opcional)</Label>
+                    <Input
+                      id="category"
+                      value={formData.category}
+                      onChange={(e) =>
+                        setFormData({ ...formData, category: e.target.value })
+                      }
+                      placeholder="Desarrollo Web, Diseño, etc."
+                    />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="deadline">Fecha límite</Label>
-                    <Input id="deadline" type="date" />
+                    <Label htmlFor="description">Descripción</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) =>
+                        setFormData({ ...formData, description: e.target.value })
+                      }
+                      placeholder="Describe el proyecto..."
+                      rows={3}
+                    />
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="description">Descripción</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Describe el proyecto..."
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsAddDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button onClick={() => setIsAddDialogOpen(false)}>
-                  Crear Proyecto
-                </Button>
-              </DialogFooter>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsAddDialogOpen(false)
+                      resetForm()
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit">
+                    Crear Proyecto
+                  </Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
@@ -298,8 +432,21 @@ export default function ProjectsPage() {
         </Card>
       </div>
 
-      {/* Kanban View */}
-      {view === "kanban" && (
+      {/* Empty State */}
+      {projects.length === 0 ? (
+        <EmptyState
+          icon={FolderKanban}
+          title="No hay proyectos"
+          description="Comienza creando tu primer proyecto para gestionar tu portafolio."
+          action={{
+            label: "Crear Proyecto",
+            onClick: () => setIsAddDialogOpen(true),
+          }}
+        />
+      ) : (
+        <>
+          {/* Kanban View */}
+          {view === "kanban" && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Object.entries(statusGroups).map(([status, statusProjects]) => (
             <Card key={status} className="flex flex-col">
@@ -329,11 +476,23 @@ export default function ProjectsPage() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem>Ver detalles</DropdownMenuItem>
-                                <DropdownMenuItem>Editar</DropdownMenuItem>
-                                <DropdownMenuItem>Cambiar estado</DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation()
+                                }}>Ver detalles</DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation()
+                                }}>Editar</DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation()
+                                }}>Cambiar estado</DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive">
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDelete(project)
+                                  }}
+                                >
                                   Eliminar
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -433,11 +592,23 @@ export default function ProjectsPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem>Ver detalles</DropdownMenuItem>
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuItem>Cambiar estado</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                          }}>Ver detalles</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                          }}>Editar</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                          }}>Cambiar estado</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDelete(project)
+                            }}
+                          >
                             Eliminar
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -492,6 +663,8 @@ export default function ProjectsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+        </>
       )}
     </div>
   )
