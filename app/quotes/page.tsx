@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Search, Download, FileText, CheckCircle, XCircle, Clock } from "lucide-react"
+import { Plus, Search, Download, FileText, CheckCircle, XCircle, Clock, Eye, Mail, Printer, MoreHorizontal, Trash2, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Card,
   CardContent,
@@ -37,6 +38,14 @@ import {
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useQuoteStore, Quote, QuoteStatus } from "@/lib/stores/quote-store"
 import { useClientStore } from "@/lib/stores/client-store"
 import { useProjectStore } from "@/lib/stores/project-store"
@@ -44,6 +53,7 @@ import { toast } from "sonner"
 import { exportToCSV } from "@/lib/export-utils"
 import { EmptyState } from "@/components/empty-state"
 import { TableSkeleton } from "@/components/skeletons/table-skeleton"
+import { QuoteTemplate } from "@/components/quote-template"
 
 export default function QuotesPage() {
   const { quotes, addQuote, updateQuote, deleteQuote } = useQuoteStore()
@@ -56,14 +66,27 @@ export default function QuotesPage() {
   const [editingQuote, setEditingQuote] = React.useState<Quote | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
 
+  // Preview and Email states
+  const [previewQuote, setPreviewQuote] = React.useState<Quote | null>(null)
+  const [emailQuote, setEmailQuote] = React.useState<Quote | null>(null)
+  const [emailForm, setEmailForm] = React.useState({
+    to: "",
+    cc: "",
+    subject: "",
+    message: ""
+  })
+  const quoteTemplateRef = React.useRef<HTMLDivElement>(null)
+
   // Form states
   const [clientId, setClientId] = React.useState<number>(0)
   const [projectId, setProjectId] = React.useState<number | undefined>(undefined)
+  const [title, setTitle] = React.useState("")
   const [items, setItems] = React.useState<Array<{ description: string; quantity: number; unitPrice: number }>>([
     { description: "", quantity: 1, unitPrice: 0 }
   ])
   const [validUntil, setValidUntil] = React.useState("")
   const [notes, setNotes] = React.useState("")
+  const [terms, setTerms] = React.useState("")
 
   React.useEffect(() => {
     setIsLoading(false)
@@ -97,9 +120,11 @@ export default function QuotesPage() {
   const resetForm = () => {
     setClientId(0)
     setProjectId(undefined)
+    setTitle("")
     setItems([{ description: "", quantity: 1, unitPrice: 0 }])
     setValidUntil("")
     setNotes("")
+    setTerms("")
   }
 
   const handleAddItem = () => {
@@ -141,6 +166,7 @@ export default function QuotesPage() {
       clientId,
       clientName: client.name,
       projectId,
+      title,
       items: items.map(item => ({
         description: item.description,
         quantity: item.quantity,
@@ -153,7 +179,8 @@ export default function QuotesPage() {
       status: "Borrador",
       issueDate: new Date().toISOString().split('T')[0],
       validUntil,
-      notes
+      notes,
+      terms
     }
 
     addQuote(newQuote)
@@ -166,6 +193,7 @@ export default function QuotesPage() {
     setEditingQuote(quote)
     setClientId(quote.clientId)
     setProjectId(quote.projectId)
+    setTitle(quote.title || "")
     setItems(quote.items.map(item => ({
       description: item.description,
       quantity: item.quantity,
@@ -173,6 +201,7 @@ export default function QuotesPage() {
     })))
     setValidUntil(quote.validUntil)
     setNotes(quote.notes || "")
+    setTerms(quote.terms || "")
     setIsEditDialogOpen(true)
   }
 
@@ -191,6 +220,7 @@ export default function QuotesPage() {
       clientId,
       clientName: client.name,
       projectId,
+      title,
       items: items.map(item => ({
         description: item.description,
         quantity: item.quantity,
@@ -201,7 +231,8 @@ export default function QuotesPage() {
       tax: calculateTax(),
       total: calculateTotal(),
       validUntil,
-      notes
+      notes,
+      terms
     }
 
     updateQuote(editingQuote.id, updatedQuote)
@@ -247,6 +278,65 @@ export default function QuotesPage() {
     }))
     exportToCSV(exportData, `cotizaciones-${new Date().toISOString().split('T')[0]}.csv`)
     toast.success("Cotizaciones exportadas exitosamente")
+  }
+
+  const handlePreview = (quote: Quote) => {
+    setPreviewQuote(quote)
+  }
+
+  const handleDownload = (quote: Quote) => {
+    setPreviewQuote(quote)
+    setTimeout(() => {
+      if (quoteTemplateRef.current) {
+        const htmlContent = quoteTemplateRef.current.innerHTML
+        const fullHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotización ${quote.quoteNumber}</title>
+</head>
+<body style="margin: 0; padding: 0;">
+  ${htmlContent}
+</body>
+</html>`
+        const blob = new Blob([fullHtml], { type: 'text/html' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `Cotizacion-${quote.quoteNumber}.html`
+        a.click()
+        URL.revokeObjectURL(url)
+        setPreviewQuote(null)
+        toast.success("Cotización descargada exitosamente")
+      }
+    }, 100)
+  }
+
+  const handlePrint = (quote: Quote) => {
+    setPreviewQuote(quote)
+    setTimeout(() => {
+      window.print()
+      setPreviewQuote(null)
+    }, 100)
+  }
+
+  const handleOpenEmail = (quote: Quote) => {
+    const client = clients.find(c => c.id === quote.clientId)
+    setEmailForm({
+      to: client?.email || "",
+      cc: "",
+      subject: `Cotización ${quote.quoteNumber} - ${quote.clientName}`,
+      message: `Estimado/a ${quote.clientName},\n\nAdjunto encontrará la cotización ${quote.quoteNumber} para su revisión.\n\nLa cotización es válida hasta el ${quote.validUntil}.\n\nQuedamos atentos a cualquier consulta.\n\nSaludos cordiales,\nDW Admin`
+    })
+    setEmailQuote(quote)
+  }
+
+  const handleSendEmail = () => {
+    // Placeholder for backend integration
+    toast.success("Email enviado exitosamente (pendiente integración backend)")
+    setEmailQuote(null)
+    setEmailForm({ to: "", cc: "", subject: "", message: "" })
   }
 
   const getStatusColor = (status: QuoteStatus) => {
@@ -411,49 +501,64 @@ export default function QuotesPage() {
                         <TableCell>{quote.issueDate}</TableCell>
                         <TableCell>{quote.validUntil}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(quote)}
-                            >
-                              Editar
-                            </Button>
-                            {quote.status === "Enviada" && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleStatusChange(quote.id, "Aceptada")}
-                                >
-                                  Aceptar
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleStatusChange(quote.id, "Rechazada")}
-                                >
-                                  Rechazar
-                                </Button>
-                              </>
-                            )}
-                            {quote.status === "Borrador" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleStatusChange(quote.id, "Enviada")}
-                              >
-                                Enviar
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(quote.id)}
-                            >
-                              Eliminar
-                            </Button>
-                          </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handlePreview(quote)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver Cotización
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDownload(quote)}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Descargar HTML
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handlePrint(quote)}>
+                                <Printer className="mr-2 h-4 w-4" />
+                                Imprimir
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenEmail(quote)}>
+                                <Mail className="mr-2 h-4 w-4" />
+                                Enviar por Email
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleEdit(quote)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              {quote.status === "Borrador" && (
+                                <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "Enviada")}>
+                                  <Mail className="mr-2 h-4 w-4" />
+                                  Marcar como Enviada
+                                </DropdownMenuItem>
+                              )}
+                              {quote.status === "Enviada" && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "Aceptada")}>
+                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                    Marcar como Aceptada
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "Rechazada")}>
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Marcar como Rechazada
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(quote.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -507,6 +612,16 @@ export default function QuotesPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="title">Título del Proyecto (opcional)</Label>
+              <Input
+                id="title"
+                placeholder="Ej: Desarrollo de Sitio Web Corporativo"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -605,6 +720,18 @@ export default function QuotesPage() {
                 onChange={(e) => setNotes(e.target.value)}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="terms">Términos y Condiciones (opcional)</Label>
+              <Textarea
+                id="terms"
+                placeholder="Ingrese los términos y condiciones personalizados (opcional). Si no se especifica, se usarán los términos predeterminados."
+                value={terms}
+                onChange={(e) => setTerms(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => {
@@ -660,6 +787,16 @@ export default function QuotesPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Título del Proyecto (opcional)</Label>
+              <Input
+                id="edit-title"
+                placeholder="Ej: Desarrollo de Sitio Web Corporativo"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -758,6 +895,18 @@ export default function QuotesPage() {
                 onChange={(e) => setNotes(e.target.value)}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-terms">Términos y Condiciones (opcional)</Label>
+              <Textarea
+                id="edit-terms"
+                placeholder="Ingrese los términos y condiciones personalizados (opcional). Si no se especifica, se usarán los términos predeterminados."
+                value={terms}
+                onChange={(e) => setTerms(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => {
@@ -771,6 +920,105 @@ export default function QuotesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={previewQuote !== null} onOpenChange={(open) => !open && setPreviewQuote(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Vista Previa - {previewQuote?.quoteNumber}</DialogTitle>
+            <DialogDescription>
+              Cotización para {previewQuote?.clientName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {previewQuote && (
+              <QuoteTemplate quote={previewQuote} ref={quoteTemplateRef} />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewQuote(null)}>
+              Cerrar
+            </Button>
+            <Button onClick={() => previewQuote && handleDownload(previewQuote)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar HTML
+            </Button>
+            <Button onClick={() => previewQuote && handlePrint(previewQuote)}>
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Dialog */}
+      <Dialog open={emailQuote !== null} onOpenChange={(open) => !open && setEmailQuote(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Enviar Cotización por Email</DialogTitle>
+            <DialogDescription>
+              Cotización {emailQuote?.quoteNumber} - {emailQuote?.clientName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="email-to">Para *</Label>
+              <Input
+                id="email-to"
+                type="email"
+                placeholder="cliente@example.com"
+                value={emailForm.to}
+                onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-cc">CC (opcional)</Label>
+              <Input
+                id="email-cc"
+                type="email"
+                placeholder="copia@example.com"
+                value={emailForm.cc}
+                onChange={(e) => setEmailForm({ ...emailForm, cc: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-subject">Asunto *</Label>
+              <Input
+                id="email-subject"
+                placeholder="Asunto del email"
+                value={emailForm.subject}
+                onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-message">Mensaje *</Label>
+              <Textarea
+                id="email-message"
+                placeholder="Mensaje del email"
+                value={emailForm.message}
+                onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
+                rows={6}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailQuote(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendEmail}>
+              <Mail className="mr-2 h-4 w-4" />
+              Enviar Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden template for download */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        {previewQuote && (
+          <QuoteTemplate quote={previewQuote} ref={quoteTemplateRef} />
+        )}
+      </div>
     </div>
   )
 }
