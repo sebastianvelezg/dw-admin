@@ -12,8 +12,12 @@ import {
   AlertCircle,
   FileText,
   Trash2,
+  Eye,
+  Mail,
+  Printer,
 } from "lucide-react"
 import { toast } from "sonner"
+import { InvoiceTemplate } from "@/components/invoice-template"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -69,6 +73,10 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
+  const [previewInvoice, setPreviewInvoice] = React.useState<Invoice | null>(null)
+  const [emailInvoice, setEmailInvoice] = React.useState<Invoice | null>(null)
+  const [emailForm, setEmailForm] = React.useState({ to: "", cc: "", subject: "", message: "" })
+  const invoiceTemplateRef = React.useRef<HTMLDivElement>(null)
 
   // Form state
   const [formData, setFormData] = React.useState({
@@ -215,6 +223,71 @@ export default function InvoicesPage() {
 
     exportToCSV(exportData, `facturas_${new Date().toISOString().split("T")[0]}.csv`)
     toast.success("Facturas exportadas")
+  }
+
+  const handlePreview = (invoice: Invoice) => {
+    setPreviewInvoice(invoice)
+  }
+
+  const handleDownload = (invoice: Invoice) => {
+    setPreviewInvoice(invoice)
+    // Wait for the template to render
+    setTimeout(() => {
+      if (invoiceTemplateRef.current) {
+        const htmlContent = invoiceTemplateRef.current.innerHTML
+        const fullHtml = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Factura ${invoice.invoiceNumber}</title>
+</head>
+<body style="margin: 0; padding: 0;">
+  ${htmlContent}
+</body>
+</html>`
+
+        const blob = new Blob([fullHtml], { type: 'text/html' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `Factura-${invoice.invoiceNumber}.html`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+
+        toast.success("Factura descargada")
+        setPreviewInvoice(null)
+      }
+    }, 100)
+  }
+
+  const handlePrint = (invoice: Invoice) => {
+    setPreviewInvoice(invoice)
+    setTimeout(() => {
+      window.print()
+      setPreviewInvoice(null)
+    }, 100)
+  }
+
+  const handleOpenEmail = (invoice: Invoice) => {
+    const client = clients.find(c => c.id === invoice.clientId)
+    setEmailForm({
+      to: client?.email || "",
+      cc: "",
+      subject: `Factura ${invoice.invoiceNumber} - ${invoice.clientName}`,
+      message: `Estimado/a ${invoice.clientName},\n\nAdjunto encontrará la factura ${invoice.invoiceNumber} por un monto total de $${invoice.total.toLocaleString()}.\n\nFecha de vencimiento: ${invoice.dueDate}\n\nGracias por su confianza.\n\nSaludos cordiales,\nDW Admin`
+    })
+    setEmailInvoice(invoice)
+  }
+
+  const handleSendEmail = () => {
+    // This is just UI for now - actual email sending would require backend
+    toast.success("Funcionalidad de envío de email estará disponible próximamente")
+    setEmailInvoice(null)
+    setEmailForm({ to: "", cc: "", subject: "", message: "" })
   }
 
   return (
@@ -561,19 +634,37 @@ export default function InvoicesPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>Ver detalles</DropdownMenuItem>
-                              <DropdownMenuItem>Descargar PDF</DropdownMenuItem>
-                              {invoice.status !== "Pagada" && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    markAsPaid(invoice.id)
-                                    toast.success("Factura marcada como pagada")
-                                  }}
-                                >
-                                  Marcar como pagada
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem onClick={() => handlePreview(invoice)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver Factura
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDownload(invoice)}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Descargar HTML
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handlePrint(invoice)}>
+                                <Printer className="mr-2 h-4 w-4" />
+                                Imprimir
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenEmail(invoice)}>
+                                <Mail className="mr-2 h-4 w-4" />
+                                Enviar por Email
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
+                              {invoice.status !== "Pagada" && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      markAsPaid(invoice.id)
+                                      toast.success("Factura marcada como pagada")
+                                    }}
+                                  >
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Marcar como Pagada
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
                               <DropdownMenuItem
                                 className="text-destructive"
                                 onClick={() => {
@@ -596,6 +687,109 @@ export default function InvoicesPage() {
             </Tabs>
           </CardContent>
         </Card>
+      )}
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewInvoice} onOpenChange={() => setPreviewInvoice(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Vista Previa de Factura</DialogTitle>
+            <DialogDescription>
+              Vista previa de la factura {previewInvoice?.invoiceNumber}
+            </DialogDescription>
+          </DialogHeader>
+          {previewInvoice && (
+            <div className="mt-4">
+              <InvoiceTemplate ref={invoiceTemplateRef} invoice={previewInvoice} />
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => previewInvoice && handlePrint(previewInvoice)}>
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir
+            </Button>
+            <Button variant="outline" onClick={() => previewInvoice && handleDownload(previewInvoice)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar
+            </Button>
+            <Button onClick={() => previewInvoice && handleOpenEmail(previewInvoice)}>
+              <Mail className="mr-2 h-4 w-4" />
+              Enviar por Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Dialog */}
+      <Dialog open={!!emailInvoice} onOpenChange={() => setEmailInvoice(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Enviar Factura por Email</DialogTitle>
+            <DialogDescription>
+              Enviar factura {emailInvoice?.invoiceNumber} a {emailInvoice?.clientName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="email-to">Para *</Label>
+              <Input
+                id="email-to"
+                type="email"
+                value={emailForm.to}
+                onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })}
+                placeholder="cliente@email.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-cc">CC</Label>
+              <Input
+                id="email-cc"
+                type="email"
+                value={emailForm.cc}
+                onChange={(e) => setEmailForm({ ...emailForm, cc: e.target.value })}
+                placeholder="copia@email.com (opcional)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-subject">Asunto *</Label>
+              <Input
+                id="email-subject"
+                value={emailForm.subject}
+                onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-message">Mensaje *</Label>
+              <textarea
+                id="email-message"
+                rows={8}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={emailForm.message}
+                onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
+              />
+            </div>
+            <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="font-medium mb-1">📎 Adjunto:</p>
+              <p>Factura-{emailInvoice?.invoiceNumber}.html</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailInvoice(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendEmail} disabled={!emailForm.to || !emailForm.subject || !emailForm.message}>
+              <Mail className="mr-2 h-4 w-4" />
+              Enviar Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden template for download */}
+      {previewInvoice && (
+        <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
+          <InvoiceTemplate ref={invoiceTemplateRef} invoice={previewInvoice} />
+        </div>
       )}
     </div>
   )

@@ -27,6 +27,7 @@ export type Quote = {
   acceptedDate?: string
   rejectedDate?: string
   notes?: string
+  terms?: string
   createdAt: string
 }
 
