@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type InvoiceStatus = 'Borrador' | 'Enviada' | 'Pagada' | 'Vencida' | 'Cancelada'
+export type InvoiceStatus = 'Borrador' | 'Enviada' | 'Pendiente' | 'Pagada' | 'Vencida' | 'Cancelada'
 
 export type InvoiceItem = {
   description: string

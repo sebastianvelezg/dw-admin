@@ -15,7 +15,8 @@ export type Quote = {
   quoteNumber: string
   clientId: number
   clientName: string
-  title: string
+  projectId?: number
+  title?: string
   items: QuoteItem[]
   subtotal: number
   tax: number
@@ -24,6 +25,7 @@ export type Quote = {
   issueDate: string
   validUntil: string
   acceptedDate?: string
+  rejectedDate?: string
   notes?: string
   createdAt: string
 }

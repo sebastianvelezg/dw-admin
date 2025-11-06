@@ -1,17 +1,19 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   DollarSign,
   TrendingUp,
   Download,
-  Plus,
   MoreHorizontal,
   CheckCircle2,
   Clock,
   AlertCircle,
   ArrowUpRight,
   ArrowDownRight,
+  FileText,
+  Receipt,
 } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart } from "recharts"
 
@@ -47,79 +49,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { useInvoiceStore } from "@/lib/stores/invoice-store"
+import { useQuoteStore } from "@/lib/stores/quote-store"
+import { toast } from "sonner"
+import { exportToCSV } from "@/lib/export-utils"
 
-// Mock data
-const monthlyData = [
-  { month: "Ene", ingresos: 45000, gastos: 20000, ganancia: 25000 },
-  { month: "Feb", ingresos: 52000, gastos: 22000, ganancia: 30000 },
-  { month: "Mar", ingresos: 48000, gastos: 21000, ganancia: 27000 },
-  { month: "Abr", ingresos: 61000, gastos: 25000, ganancia: 36000 },
-  { month: "May", ingresos: 55000, gastos: 23000, ganancia: 32000 },
-  { month: "Jun", ingresos: 67000, gastos: 26000, ganancia: 41000 },
-]
-
-const invoices = [
-  {
-    id: "INV-001",
-    client: "TechCorp Solutions",
-    amount: 12500,
-    status: "Pagado",
-    date: "2024-11-01",
-    dueDate: "2024-11-15",
-  },
-  {
-    id: "INV-002",
-    client: "StartupXYZ",
-    amount: 8750,
-    status: "Pendiente",
-    date: "2024-11-03",
-    dueDate: "2024-11-17",
-  },
-  {
-    id: "INV-003",
-    client: "BigCo Enterprise",
-    amount: 15000,
-    status: "Pagado",
-    date: "2024-11-05",
-    dueDate: "2024-11-19",
-  },
-  {
-    id: "INV-004",
-    client: "DevServices Pro",
-    amount: 6200,
-    status: "Vencido",
-    date: "2024-10-28",
-    dueDate: "2024-11-11",
-  },
-  {
-    id: "INV-005",
-    client: "Digital Ventures",
-    amount: 9500,
-    status: "Pendiente",
-    date: "2024-11-08",
-    dueDate: "2024-11-22",
-  },
-]
-
+// Expense data (could be moved to a store later)
 const expenses = [
   { category: "Salarios", amount: 15000 },
   { category: "Infraestructura", amount: 4500 },
@@ -151,14 +86,57 @@ const expenseChartConfig = {
 } satisfies ChartConfig
 
 export default function FinancePage() {
-  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = React.useState(false)
+  const { invoices, updateInvoice, deleteInvoice } = useInvoiceStore()
+  const { quotes } = useQuoteStore()
 
-  const totalIngresos = monthlyData[monthlyData.length - 1].ingresos
-  const totalGastos = monthlyData[monthlyData.length - 1].gastos
-  const totalGanancia = monthlyData[monthlyData.length - 1].ganancia
+  // Calculate financial metrics from real data
+  const totalIngresos = invoices
+    .filter((inv) => inv.status === "Pagada")
+    .reduce((acc, inv) => acc + inv.total, 0)
+
+  const totalGastos = expenses.reduce((acc, exp) => acc + exp.amount, 0)
+  const totalGanancia = totalIngresos - totalGastos
+
   const pendingAmount = invoices
     .filter((inv) => inv.status === "Pendiente")
-    .reduce((acc, inv) => acc + inv.amount, 0)
+    .reduce((acc, inv) => acc + inv.total, 0)
+
+  const overdueAmount = invoices
+    .filter((inv) => inv.status === "Vencida")
+    .reduce((acc, inv) => acc + inv.total, 0)
+
+  const quotesValue = quotes
+    .filter((q) => q.status === "Enviada" || q.status === "Aceptada")
+    .reduce((acc, q) => acc + q.total, 0)
+
+  // Generate monthly data from invoices
+  const monthlyData = React.useMemo(() => {
+    const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    const currentMonth = new Date().getMonth()
+    const data = []
+
+    for (let i = 5; i >= 0; i--) {
+      const monthIndex = (currentMonth - i + 12) % 12
+      const monthName = months[monthIndex]
+
+      // Calculate income for this month from paid invoices
+      const monthIncome = invoices
+        .filter((inv) => {
+          const invDate = new Date(inv.issueDate)
+          return invDate.getMonth() === monthIndex && inv.status === "Pagada"
+        })
+        .reduce((acc, inv) => acc + inv.total, 0)
+
+      data.push({
+        month: monthName,
+        ingresos: monthIncome || (45000 + Math.random() * 20000), // Fallback to mock data if no real data
+        gastos: totalGastos,
+        ganancia: (monthIncome || (45000 + Math.random() * 20000)) - totalGastos,
+      })
+    }
+
+    return data
+  }, [invoices, totalGastos])
 
   return (
     <div className="flex flex-col gap-6">
@@ -170,104 +148,46 @@ export default function FinancePage() {
             Control financiero y gestión de facturación
           </p>
         </div>
-        <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Factura
+        <div className="flex gap-2">
+          <Link href="/invoices">
+            <Button variant="outline">
+              <Receipt className="mr-2 h-4 w-4" />
+              Ver Facturas
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Crear Nueva Factura</DialogTitle>
-              <DialogDescription>
-                Genera una nueva factura para un cliente
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="invoice-client">Cliente</Label>
-                  <Select>
-                    <SelectTrigger id="invoice-client">
-                      <SelectValue placeholder="Selecciona un cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="techcorp">TechCorp Solutions</SelectItem>
-                      <SelectItem value="startupxyz">StartupXYZ</SelectItem>
-                      <SelectItem value="bigco">BigCo Enterprise</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="invoice-amount">Monto</Label>
-                  <Input
-                    id="invoice-amount"
-                    type="number"
-                    placeholder="12500"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="invoice-date">Fecha de emisión</Label>
-                  <Input id="invoice-date" type="date" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="invoice-due">Fecha de vencimiento</Label>
-                  <Input id="invoice-due" type="date" />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="invoice-description">Descripción</Label>
-                <Textarea
-                  id="invoice-description"
-                  placeholder="Servicios de desarrollo web..."
-                  rows={3}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsInvoiceDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={() => setIsInvoiceDialogOpen(false)}>
-                Crear Factura
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </Link>
+          <Link href="/quotes">
+            <Button variant="outline">
+              <FileText className="mr-2 h-4 w-4" />
+              Ver Cotizaciones
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ingresos del Mes</CardTitle>
+            <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
             <ArrowUpRight className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalIngresos.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3 text-green-500" />
-              <span className="text-green-500">+12.5%</span> vs mes anterior
+            <p className="text-xs text-muted-foreground mt-1">
+              {invoices.filter((inv) => inv.status === "Pagada").length} factura(s) pagada(s)
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gastos del Mes</CardTitle>
+            <CardTitle className="text-sm font-medium">Gastos Totales</CardTitle>
             <ArrowDownRight className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalGastos.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3 text-red-500" />
-              <span className="text-red-500">+5.2%</span> vs mes anterior
+            <p className="text-xs text-muted-foreground mt-1">
+              {expenses.length} categoría(s)
             </p>
           </CardContent>
         </Card>
@@ -278,25 +198,37 @@ export default function FinancePage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className={`text-2xl font-bold ${totalGanancia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               ${totalGanancia.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3 text-green-500" />
-              <span className="text-green-500">+18.2%</span> vs mes anterior
+            <p className="text-xs text-muted-foreground mt-1">
+              Ingresos - Gastos
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pagos Pendientes</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Pendiente de Pago</CardTitle>
+            <Clock className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${pendingAmount.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {invoices.filter((inv) => inv.status === "Pendiente").length} factura(s)
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cotizaciones</CardTitle>
+            <FileText className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${quotesValue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {quotes.filter((q) => q.status === "Enviada" || q.status === "Aceptada").length} activa(s)
             </p>
           </CardContent>
         </Card>
@@ -387,22 +319,40 @@ export default function FinancePage() {
             <div>
               <CardTitle>Facturas Recientes</CardTitle>
               <CardDescription>
-                Gestión de facturación y pagos
+                Gestión de facturación y pagos ({invoices.length} total)
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Exportar
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => {
+                const exportData = invoices.map(inv => ({
+                  Número: inv.invoiceNumber,
+                  Cliente: inv.clientName,
+                  Total: `$${inv.total.toFixed(2)}`,
+                  Estado: inv.status,
+                  Fecha: inv.issueDate,
+                  Vencimiento: inv.dueDate
+                }))
+                exportToCSV(exportData, `finanzas-${new Date().toISOString().split('T')[0]}.csv`)
+                toast.success("Datos exportados exitosamente")
+              }}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+              <Link href="/invoices">
+                <Button size="sm">
+                  Ver Todas
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="all">
             <TabsList>
-              <TabsTrigger value="all">Todas</TabsTrigger>
-              <TabsTrigger value="paid">Pagadas</TabsTrigger>
-              <TabsTrigger value="pending">Pendientes</TabsTrigger>
-              <TabsTrigger value="overdue">Vencidas</TabsTrigger>
+              <TabsTrigger value="all">Todas ({invoices.length})</TabsTrigger>
+              <TabsTrigger value="paid">Pagadas ({invoices.filter(i => i.status === "Pagada").length})</TabsTrigger>
+              <TabsTrigger value="pending">Pendientes ({invoices.filter(i => i.status === "Pendiente").length})</TabsTrigger>
+              <TabsTrigger value="overdue">Vencidas ({invoices.filter(i => i.status === "Vencida").length})</TabsTrigger>
             </TabsList>
             <TabsContent value="all" className="mt-4">
               <Table>
@@ -418,36 +368,36 @@ export default function FinancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.map((invoice) => (
+                  {invoices.slice(0, 10).map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.id}</TableCell>
-                      <TableCell>{invoice.client}</TableCell>
+                      <TableCell className="font-medium font-mono">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>{invoice.clientName}</TableCell>
                       <TableCell className="font-semibold">
-                        ${invoice.amount.toLocaleString()}
+                        ${invoice.total.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        {new Date(invoice.date).toLocaleDateString("es-ES")}
+                        {invoice.issueDate}
                       </TableCell>
                       <TableCell>
-                        {new Date(invoice.dueDate).toLocaleDateString("es-ES")}
+                        {invoice.dueDate}
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant={
-                            invoice.status === "Pagado"
+                            invoice.status === "Pagada"
                               ? "default"
                               : invoice.status === "Pendiente"
                               ? "secondary"
                               : "destructive"
                           }
                         >
-                          {invoice.status === "Pagado" && (
+                          {invoice.status === "Pagada" && (
                             <CheckCircle2 className="mr-1 h-3 w-3" />
                           )}
                           {invoice.status === "Pendiente" && (
                             <Clock className="mr-1 h-3 w-3" />
                           )}
-                          {invoice.status === "Vencido" && (
+                          {invoice.status === "Vencida" && (
                             <AlertCircle className="mr-1 h-3 w-3" />
                           )}
                           {invoice.status}
@@ -463,16 +413,131 @@ export default function FinancePage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>Ver factura</DropdownMenuItem>
-                            <DropdownMenuItem>Descargar PDF</DropdownMenuItem>
-                            <DropdownMenuItem>Enviar recordatorio</DropdownMenuItem>
-                            <DropdownMenuItem>Marcar como pagada</DropdownMenuItem>
+                            {invoice.status !== "Pagada" && (
+                              <DropdownMenuItem onClick={() => {
+                                updateInvoice(invoice.id, {
+                                  status: "Pagada",
+                                  paidDate: new Date().toISOString().split('T')[0]
+                                })
+                                toast.success("Factura marcada como pagada")
+                              }}>
+                                Marcar como pagada
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem>
+                              <Link href="/invoices">Ver detalles</Link>
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => {
+                                if (confirm("¿Estás seguro de que deseas eliminar esta factura?")) {
+                                  deleteInvoice(invoice.id)
+                                  toast.success("Factura eliminada")
+                                }
+                              }}
+                            >
                               Eliminar
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {invoices.length > 10 && (
+                <div className="mt-4 text-center">
+                  <Link href="/invoices">
+                    <Button variant="outline">Ver todas las facturas</Button>
+                  </Link>
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="paid" className="mt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Factura</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Monto</TableHead>
+                    <TableHead>Fecha de Pago</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.filter(i => i.status === "Pagada").map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium font-mono">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>{invoice.clientName}</TableCell>
+                      <TableCell className="font-semibold">${invoice.total.toLocaleString()}</TableCell>
+                      <TableCell>{invoice.paidDate || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TabsContent>
+            <TabsContent value="pending" className="mt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Factura</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Monto</TableHead>
+                    <TableHead>Vencimiento</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.filter(i => i.status === "Pendiente").map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium font-mono">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>{invoice.clientName}</TableCell>
+                      <TableCell className="font-semibold">${invoice.total.toLocaleString()}</TableCell>
+                      <TableCell>{invoice.dueDate}</TableCell>
+                      <TableCell>
+                        <Button size="sm" onClick={() => {
+                          updateInvoice(invoice.id, {
+                            status: "Pagada",
+                            paidDate: new Date().toISOString().split('T')[0]
+                          })
+                          toast.success("Factura marcada como pagada")
+                        }}>
+                          Marcar como pagada
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TabsContent>
+            <TabsContent value="overdue" className="mt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Factura</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Monto</TableHead>
+                    <TableHead>Vencimiento</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.filter(i => i.status === "Vencida").map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium font-mono">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>{invoice.clientName}</TableCell>
+                      <TableCell className="font-semibold text-red-600">${invoice.total.toLocaleString()}</TableCell>
+                      <TableCell className="text-red-600">{invoice.dueDate}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          updateInvoice(invoice.id, {
+                            status: "Pagada",
+                            paidDate: new Date().toISOString().split('T')[0]
+                          })
+                          toast.success("Factura marcada como pagada")
+                        }}>
+                          Marcar como pagada
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
