@@ -84,8 +84,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const unwrappedParams = React.use(params)
   const projectId = parseInt(unwrappedParams.id)
 
-  const { getProjectById, markMilestoneAsPaid } = useProjectStore()
-  const { clients } = useClientStore()
+  const { getProjectById, markMilestoneAsPaid, fetchProjects, initialized, loading } = useProjectStore()
+  const { clients, fetchClients, initialized: clientsInitialized } = useClientStore()
   const { tasks, addTask, deleteTask, toggleTaskStatus } = useTaskStore()
   const { meetings, addMeeting, deleteMeeting } = useMeetingStore()
   const { links, addLink, deleteLink } = useLinkStore()
@@ -129,6 +129,29 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     type: "Repositorio",
     description: "",
   })
+
+  // Fetch projects and clients on mount
+  React.useEffect(() => {
+    if (!initialized) {
+      fetchProjects()
+    }
+  }, [initialized, fetchProjects])
+
+  React.useEffect(() => {
+    if (!clientsInitialized) {
+      fetchClients()
+    }
+  }, [clientsInitialized, fetchClients])
+
+  if (loading && !initialized) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg">Cargando proyecto...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!project) {
     return (
@@ -231,9 +254,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     })
   }
 
-  const handleMarkMilestoneAsPaid = (milestoneId: number) => {
-    markMilestoneAsPaid(projectId, milestoneId, new Date().toISOString().split('T')[0])
-    toast.success("Hito marcado como pagado")
+  const handleMarkMilestoneAsPaid = async (milestoneId: number) => {
+    try {
+      await markMilestoneAsPaid(projectId, milestoneId, new Date().toISOString().split('T')[0])
+      toast.success("Hito marcado como pagado")
+    } catch (error) {
+      toast.error("Error al marcar hito como pagado")
+    }
   }
 
   const getStatusColor = (status: string) => {
