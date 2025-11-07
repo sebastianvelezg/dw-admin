@@ -55,31 +55,65 @@ The project store has been successfully migrated with:
 - `meetings` (has separate store)
 - `project_links` (has separate store)
 
-## 🚧 TODO
-
 ### 5. Invoice Store Migration
-**Status:** Not Started
+**Status:** ✅ Completed
 **Complexity:** Medium (has invoice_items relationship)
 
-**Files to Update:**
-- `lib/stores/invoice-store.ts`
-- `app/invoices/page.tsx`
+The invoice store has been successfully migrated with:
+- ✅ Fetch invoices with invoice items
+- ✅ All CRUD operations working with database
+- ✅ Nested creates/updates/deletes for invoice items
+- ✅ Automatic invoice number generation
+- ✅ Mark as paid functionality
+- ✅ Invoices page already had fetchInvoices call
+
+**Files Updated:**
+- ✅ `lib/stores/invoice-store.ts` - Migrated to Supabase
+- ✅ `app/invoices/page.tsx` - Already using async operations
 
 **Related Tables:**
-- `invoices`
-- `invoice_items`
+- `invoices` ✅
+- `invoice_items` ✅
 
 ### 6. Quote Store Migration
-**Status:** Not Started
+**Status:** ✅ Completed
 **Complexity:** Medium (has quote_items relationship)
 
-**Files to Update:**
-- `lib/stores/quote-store.ts`
-- `app/quotes/page.tsx`
+The quote store has been successfully migrated with:
+- ✅ Fetch quotes with quote items
+- ✅ All CRUD operations working with database
+- ✅ Nested creates/updates/deletes for quote items
+- ✅ Automatic quote number generation
+- ✅ Accept/Reject quote functionality
+- ✅ Quotes page updated to use async operations
+
+**Files Updated:**
+- ✅ `lib/stores/quote-store.ts` - Migrated to Supabase
+- ✅ `app/quotes/page.tsx` - Updated with fetchQuotes and async handlers
 
 **Related Tables:**
-- `quotes`
-- `quote_items`
+- `quotes` ✅
+- `quote_items` ✅
+
+### 7. Employee Store Migration
+**Status:** ✅ Completed
+**Complexity:** Medium
+
+The employee store has been successfully migrated with:
+- ✅ Fetch employees with project counts
+- ✅ All CRUD operations working with database
+- ✅ Integration with team_members table for project counts
+- ✅ Loading and initialized state tracking
+- ✅ Employees page updated to use async operations
+- ✅ Added migration 003_add_employees_table.sql
+
+**Files Updated:**
+- ✅ `lib/stores/employee-store.ts` - Migrated to Supabase
+- ✅ `app/employees/page.tsx` - Updated with fetchEmployees
+- ✅ `supabase/migrations/003_add_employees_table.sql` - New employees table
+
+**Related Tables:**
+- `employees` ✅
 
 ## 📝 Setup Instructions
 
@@ -193,21 +227,20 @@ const handleAdd = async () => {
 
 ## 🎯 Next Steps
 
-1. **Migrate Invoice Store** (High Priority)
-   - Handle invoice_items relationship
-   - Similar pattern to clients
+1. **Run Database Migrations**
+   - Execute `002_fix_project_status.sql` in Supabase SQL Editor
+   - Execute `003_add_employees_table.sql` in Supabase SQL Editor
 
-2. **Migrate Quote Store**
-   - Handle quote_items relationship
-   - Similar pattern to invoices
+2. **Optional Enhancements**
+   - Add Real-time Subscriptions for live updates
+   - Add Pagination for large datasets
+   - Implement search and filter optimizations
+   - Add export functionality for all modules
 
-3. **Add Real-time Subscriptions** (Optional Enhancement)
-   - Live updates when data changes
-   - Useful for collaborative features
-
-4. **Add Pagination** (Performance Optimization)
-   - For large datasets
-   - Implement on tables with many records
+3. **Testing**
+   - Test all CRUD operations for each module
+   - Verify RLS policies are working correctly
+   - Test data isolation between users
 
 ## 📚 Resources
 

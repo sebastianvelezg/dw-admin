@@ -56,15 +56,14 @@ import { TableSkeleton } from "@/components/skeletons/table-skeleton"
 import { QuoteTemplate } from "@/components/quote-template"
 
 export default function QuotesPage() {
-  const { quotes, addQuote, updateQuote, deleteQuote } = useQuoteStore()
-  const { clients } = useClientStore()
-  const { projects } = useProjectStore()
+  const { quotes, addQuote, updateQuote, deleteQuote, fetchQuotes, loading, initialized } = useQuoteStore()
+  const { clients, fetchClients, initialized: clientsInitialized } = useClientStore()
+  const { projects, fetchProjects, initialized: projectsInitialized } = useProjectStore()
   const [searchQuery, setSearchQuery] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<QuoteStatus | "all">("all")
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [editingQuote, setEditingQuote] = React.useState<Quote | null>(null)
-  const [isLoading, setIsLoading] = React.useState(true)
 
   // Preview and Email states
   const [previewQuote, setPreviewQuote] = React.useState<Quote | null>(null)
@@ -88,9 +87,24 @@ export default function QuotesPage() {
   const [notes, setNotes] = React.useState("")
   const [terms, setTerms] = React.useState("")
 
+  // Fetch data on mount
   React.useEffect(() => {
-    setIsLoading(false)
-  }, [])
+    if (!initialized) {
+      fetchQuotes()
+    }
+  }, [initialized, fetchQuotes])
+
+  React.useEffect(() => {
+    if (!clientsInitialized) {
+      fetchClients()
+    }
+  }, [clientsInitialized, fetchClients])
+
+  React.useEffect(() => {
+    if (!projectsInitialized) {
+      fetchProjects()
+    }
+  }, [projectsInitialized, fetchProjects])
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch =
@@ -143,7 +157,7 @@ export default function QuotesPage() {
     setItems(newItems)
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (clientId === 0) {
       toast.error("Por favor selecciona un cliente")
       return
@@ -183,10 +197,14 @@ export default function QuotesPage() {
       terms
     }
 
-    addQuote(newQuote)
-    toast.success("Cotización creada exitosamente")
-    setIsAddDialogOpen(false)
-    resetForm()
+    try {
+      await addQuote(newQuote)
+      toast.success("Cotización creada exitosamente")
+      setIsAddDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      toast.error("Error al crear la cotización")
+    }
   }
 
   const handleEdit = (quote: Quote) => {
@@ -205,7 +223,7 @@ export default function QuotesPage() {
     setIsEditDialogOpen(true)
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editingQuote) return
 
     if (items.some(item => !item.description || item.quantity <= 0 || item.unitPrice <= 0)) {
@@ -235,17 +253,25 @@ export default function QuotesPage() {
       terms
     }
 
-    updateQuote(editingQuote.id, updatedQuote)
-    toast.success("Cotización actualizada exitosamente")
-    setIsEditDialogOpen(false)
-    setEditingQuote(null)
-    resetForm()
+    try {
+      await updateQuote(editingQuote.id, updatedQuote)
+      toast.success("Cotización actualizada exitosamente")
+      setIsEditDialogOpen(false)
+      setEditingQuote(null)
+      resetForm()
+    } catch (error) {
+      toast.error("Error al actualizar la cotización")
+    }
   }
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm("¿Estás seguro de que deseas eliminar esta cotización?")) {
-      deleteQuote(id)
-      toast.success("Cotización eliminada exitosamente")
+      try {
+        await deleteQuote(id)
+        toast.success("Cotización eliminada exitosamente")
+      } catch (error) {
+        toast.error("Error al eliminar la cotización")
+      }
     }
   }
 
