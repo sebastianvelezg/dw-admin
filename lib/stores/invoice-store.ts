@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createClient } from '@/lib/supabase/client'
 
-export type InvoiceStatus = 'Borrador' | 'Enviada' | 'Pendiente' | 'Pagada' | 'Vencida' | 'Cancelada'
+export type InvoiceStatus = 'Borrador' | 'Enviada' | 'Pagada' | 'Vencida' | 'Cancelada'
 
 export type InvoiceItem = {
   description: string
@@ -42,8 +42,6 @@ type InvoiceStore = {
   generateInvoiceNumber: () => Promise<string>
 }
 
-const supabase = createClient()
-
 export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   invoices: [],
   loading: false,
@@ -52,6 +50,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   fetchInvoices: async () => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -87,7 +86,15 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      if (invoicesError) throw invoicesError
+      if (invoicesError) {
+        console.error('Error fetching invoices:', {
+          message: invoicesError.message,
+          details: invoicesError.details,
+          hint: invoicesError.hint,
+          code: invoicesError.code
+        })
+        throw invoicesError
+      }
 
       // Map database format to Invoice type
       const invoices: Invoice[] = (invoicesData || []).map((invoice: any) => ({
@@ -115,8 +122,12 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       }))
 
       set({ invoices, loading: false, initialized: true })
-    } catch (error) {
-      console.error('Error fetching invoices:', error)
+    } catch (error: any) {
+      console.error('Error fetching invoices:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false, initialized: true })
     }
   },
@@ -124,6 +135,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   addInvoice: async (invoice) => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
@@ -154,7 +166,15 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         .select()
         .single()
 
-      if (invoiceError) throw invoiceError
+      if (invoiceError) {
+        console.error('Error adding invoice:', {
+          message: invoiceError.message,
+          details: invoiceError.details,
+          hint: invoiceError.hint,
+          code: invoiceError.code
+        })
+        throw invoiceError
+      }
 
       // Insert invoice items
       const itemsToInsert = invoice.items.map((item) => ({
@@ -170,7 +190,15 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         .from('invoice_items')
         .insert(itemsToInsert)
 
-      if (itemsError) throw itemsError
+      if (itemsError) {
+        console.error('Error adding invoice items:', {
+          message: itemsError.message,
+          details: itemsError.details,
+          hint: itemsError.hint,
+          code: itemsError.code
+        })
+        throw itemsError
+      }
 
       // Add to local state
       const newInvoice: Invoice = {
@@ -196,8 +224,12 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         invoices: [newInvoice, ...state.invoices],
         loading: false,
       }))
-    } catch (error) {
-      console.error('Error adding invoice:', error)
+    } catch (error: any) {
+      console.error('Error adding invoice:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false })
       throw error
     }
@@ -206,6 +238,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   updateInvoice: async (id, updatedInvoice) => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
@@ -233,7 +266,15 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         .select()
         .single()
 
-      if (invoiceError) throw invoiceError
+      if (invoiceError) {
+        console.error('Error updating invoice:', {
+          message: invoiceError.message,
+          details: invoiceError.details,
+          hint: invoiceError.hint,
+          code: invoiceError.code
+        })
+        throw invoiceError
+      }
 
       // If items are being updated, delete old items and insert new ones
       if (updatedInvoice.items) {
@@ -244,7 +285,15 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
           .eq('invoice_id', id)
           .eq('user_id', user.id)
 
-        if (deleteError) throw deleteError
+        if (deleteError) {
+          console.error('Error deleting invoice items:', {
+            message: deleteError.message,
+            details: deleteError.details,
+            hint: deleteError.hint,
+            code: deleteError.code
+          })
+          throw deleteError
+        }
 
         // Insert new items
         const itemsToInsert = updatedInvoice.items.map((item) => ({
@@ -260,7 +309,15 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
           .from('invoice_items')
           .insert(itemsToInsert)
 
-        if (itemsError) throw itemsError
+        if (itemsError) {
+          console.error('Error inserting invoice items:', {
+            message: itemsError.message,
+            details: itemsError.details,
+            hint: itemsError.hint,
+            code: itemsError.code
+          })
+          throw itemsError
+        }
       }
 
       // Update local state
@@ -270,8 +327,12 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         ),
         loading: false,
       }))
-    } catch (error) {
-      console.error('Error updating invoice:', error)
+    } catch (error: any) {
+      console.error('Error updating invoice:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false })
       throw error
     }
@@ -280,6 +341,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   deleteInvoice: async (id) => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
@@ -291,14 +353,26 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         .eq('id', id)
         .eq('user_id', user.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('Error deleting invoice:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
 
       set((state) => ({
         invoices: state.invoices.filter((invoice) => invoice.id !== id),
         loading: false,
       }))
-    } catch (error) {
-      console.error('Error deleting invoice:', error)
+    } catch (error: any) {
+      console.error('Error deleting invoice:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false })
       throw error
     }
@@ -311,6 +385,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   markAsPaid: async (id) => {
     try {
       set({ loading: true })
+      const supabase = createClient()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
@@ -326,7 +401,15 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         .eq('id', id)
         .eq('user_id', user.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('Error marking invoice as paid:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
 
       set((state) => ({
         invoices: state.invoices.map((invoice) =>
@@ -340,8 +423,12 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         ),
         loading: false,
       }))
-    } catch (error) {
-      console.error('Error marking invoice as paid:', error)
+    } catch (error: any) {
+      console.error('Error marking invoice as paid:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       set({ loading: false })
       throw error
     }
@@ -349,6 +436,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
 
   generateInvoiceNumber: async () => {
     try {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
@@ -361,12 +449,24 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         .eq('user_id', user.id)
         .like('invoice_number', `INV-${year}-%`)
 
-      if (error) throw error
+      if (error) {
+        console.error('Error generating invoice number:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
 
       const count = (data || []).length
       return `INV-${year}-${String(count + 1).padStart(3, '0')}`
-    } catch (error) {
-      console.error('Error generating invoice number:', error)
+    } catch (error: any) {
+      console.error('Error generating invoice number:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
       // Fallback to timestamp-based number
       return `INV-${new Date().getFullYear()}-${Date.now()}`
     }
