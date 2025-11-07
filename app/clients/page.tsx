@@ -77,7 +77,7 @@ export default function ClientsPage() {
     email: "",
     phone: "",
     company: "",
-    status: "Lead" as Client["status"],
+    status: "Prospecto" as Client["status"],
     location: "",
     notes: "",
     projects: 0,
@@ -108,7 +108,7 @@ export default function ClientsPage() {
       email: "",
       phone: "",
       company: "",
-      status: "Lead",
+      status: "Prospecto",
       location: "",
       notes: "",
       projects: 0,
@@ -199,7 +199,7 @@ export default function ClientsPage() {
     switch (status) {
       case "Activo":
         return "default"
-      case "Lead":
+      case "Prospecto":
         return "secondary"
       case "Inactivo":
         return "outline"
@@ -302,7 +302,7 @@ export default function ClientsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Lead">Lead</SelectItem>
+                        <SelectItem value="Prospecto">Prospecto</SelectItem>
                         <SelectItem value="Activo">Activo</SelectItem>
                         <SelectItem value="Inactivo">Inactivo</SelectItem>
                       </SelectContent>
@@ -408,12 +408,12 @@ export default function ClientsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Leads
+              Prospectos
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {clients.filter((c) => c.status === "Lead").length}
+              {clients.filter((c) => c.status === "Prospecto").length}
             </div>
           </CardContent>
         </Card>
@@ -470,7 +470,7 @@ export default function ClientsPage() {
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="Activo">Activos</SelectItem>
-                    <SelectItem value="Lead">Leads</SelectItem>
+                    <SelectItem value="Prospecto">Prospectos</SelectItem>
                     <SelectItem value="Inactivo">Inactivos</SelectItem>
                   </SelectContent>
                 </Select>

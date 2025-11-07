@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS projects (
   client_id BIGINT REFERENCES clients(id) ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
-  status TEXT NOT NULL DEFAULT 'En Progreso' CHECK (status IN ('Pendiente', 'En Progreso', 'Completado', 'Cancelado')),
+  status TEXT NOT NULL DEFAULT 'En progreso' CHECK (status IN ('Planeación', 'En progreso', 'En revisión', 'Completado', 'En pausa')),
   priority TEXT DEFAULT 'Media' CHECK (priority IN ('Baja', 'Media', 'Alta')),
   category TEXT,
   start_date DATE NOT NULL,

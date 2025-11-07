@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createClient } from '@/lib/supabase/client'
 
 export type ProjectStatus = 'Planeación' | 'En progreso' | 'En revisión' | 'Completado' | 'En pausa'
 
@@ -45,427 +45,375 @@ export type Project = {
 
 type ProjectStore = {
   projects: Project[]
-  addProject: (project: Omit<Project, 'id' | 'createdAt'>) => void
-  updateProject: (id: number, project: Partial<Project>) => void
-  deleteProject: (id: number) => void
-  updateProjectStatus: (id: number, status: ProjectStatus) => void
+  loading: boolean
+  initialized: boolean
+  fetchProjects: () => Promise<void>
+  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'team' | 'teamMembers' | 'paymentMilestones' | 'totalPaid' | 'client'>) => Promise<void>
+  updateProject: (id: number, project: Partial<Project>) => Promise<void>
+  deleteProject: (id: number) => Promise<void>
+  updateProjectStatus: (id: number, status: ProjectStatus) => Promise<void>
   getProjectById: (id: number) => Project | undefined
   getProjectsByStatus: (status: ProjectStatus) => Project[]
-  updatePaymentMilestone: (projectId: number, milestoneId: number, updates: Partial<PaymentMilestone>) => void
-  markMilestoneAsPaid: (projectId: number, milestoneId: number, paidDate: string, invoiceId?: number) => void
+  updatePaymentMilestone: (projectId: number, milestoneId: number, updates: Partial<PaymentMilestone>) => Promise<void>
+  markMilestoneAsPaid: (projectId: number, milestoneId: number, paidDate: string, invoiceId?: number) => Promise<void>
 }
 
-const initialProjects: Project[] = [
-  {
-    id: 1,
-    title: "E-commerce Platform",
-    client: "TechCorp Solutions",
-    clientId: 1,
-    status: "En progreso",
-    progress: 75,
-    budget: 45000,
-    spent: 33750,
-    deadline: "2024-12-15",
-    startDate: "2023-09-01",
-    team: 4,
-    teamMembers: [
-      { id: 1, name: "María García", role: "Frontend Lead" },
-      { id: 2, name: "Juan Pérez", role: "Backend Developer" },
-      { id: 3, name: "Laura Torres", role: "QA Engineer" },
-      { id: 4, name: "Carlos Ruiz", role: "UI/UX Designer" },
-    ],
-    description: "Plataforma completa de e-commerce con integración de pagos",
-    paymentMilestones: [
-      {
-        id: 1,
-        name: "Pago Inicial",
-        percentage: 30,
-        amount: 13500,
-        status: "Pagada",
-        dueDate: "2023-09-15",
-        paidDate: "2023-09-12",
-        invoiceId: 1,
-        description: "30% al inicio del proyecto",
-      },
-      {
-        id: 2,
-        name: "Entrega MVP",
-        percentage: 40,
-        amount: 18000,
-        status: "Pagada",
-        dueDate: "2023-11-01",
-        paidDate: "2023-10-28",
-        description: "40% al entregar el MVP funcional",
-      },
-      {
-        id: 3,
-        name: "Entrega Final",
-        percentage: 30,
-        amount: 13500,
-        status: "Pendiente",
-        dueDate: "2024-12-20",
-        description: "30% al completar el proyecto",
-      },
-    ],
-    totalPaid: 31500,
-    category: "Desarrollo Web",
-    priority: "Alta",
-    createdAt: new Date('2023-09-01').toISOString(),
-  },
-  {
-    id: 2,
-    title: "Mobile App Redesign",
-    client: "StartupXYZ",
-    clientId: 2,
-    status: "Planeación",
-    progress: 25,
-    budget: 30000,
-    spent: 7500,
-    deadline: "2024-12-30",
-    startDate: "2023-10-10",
-    team: 3,
-    teamMembers: [
-      { id: 5, name: "Ana Martínez", role: "Mobile Developer" },
-      { id: 6, name: "Pedro López", role: "UI Designer" },
-      { id: 7, name: "Sofia Hernández", role: "Project Manager" },
-    ],
-    description: "Rediseño completo de aplicación móvil iOS y Android",
-    paymentMilestones: [
-      {
-        id: 1,
-        name: "Anticipo",
-        percentage: 50,
-        amount: 15000,
-        status: "Pagada",
-        dueDate: "2023-10-20",
-        paidDate: "2023-10-18",
-        description: "50% de anticipo",
-      },
-      {
-        id: 2,
-        name: "Entrega Final",
-        percentage: 50,
-        amount: 15000,
-        status: "Pendiente",
-        dueDate: "2024-12-30",
-        description: "50% al finalizar",
-      },
-    ],
-    totalPaid: 15000,
-    category: "Desarrollo Móvil",
-    priority: "Media",
-    createdAt: new Date('2023-10-10').toISOString(),
-  },
-  {
-    id: 3,
-    title: "Corporate Website",
-    client: "BigCo Enterprise",
-    clientId: 3,
-    status: "Completado",
-    progress: 100,
-    budget: 15000,
-    spent: 15000,
-    deadline: "2024-11-20",
-    startDate: "2023-08-15",
-    team: 2,
-    teamMembers: [
-      { id: 8, name: "Roberto Díaz", role: "Full Stack Developer" },
-      { id: 9, name: "Carmen Vega", role: "Content Manager" },
-    ],
-    description: "Sitio web corporativo con CMS",
-    paymentMilestones: [
-      {
-        id: 1,
-        name: "Pago Único",
-        percentage: 100,
-        amount: 15000,
-        status: "Pagada",
-        dueDate: "2024-11-20",
-        paidDate: "2024-11-18",
-        description: "Pago completo al finalizar",
-      },
-    ],
-    totalPaid: 15000,
-    category: "Desarrollo Web",
-    priority: "Baja",
-    createdAt: new Date('2023-08-15').toISOString(),
-  },
-  {
-    id: 4,
-    title: "API Integration",
-    client: "DevServices Pro",
-    clientId: 4,
-    status: "En progreso",
-    progress: 60,
-    budget: 20000,
-    spent: 12000,
-    deadline: "2024-12-10",
-    startDate: "2023-09-20",
-    team: 5,
-    teamMembers: [
-      { id: 10, name: "Miguel Ángel", role: "Backend Lead" },
-      { id: 11, name: "Isabel Castro", role: "DevOps" },
-      { id: 12, name: "Fernando Ramos", role: "API Specialist" },
-      { id: 13, name: "Lucía Morales", role: "QA" },
-      { id: 14, name: "Diego Santos", role: "Documentation" },
-    ],
-    description: "Integración de APIs de terceros",
-    paymentMilestones: [
-      {
-        id: 1,
-        name: "Fase 1",
-        percentage: 30,
-        amount: 6000,
-        status: "Pagada",
-        dueDate: "2023-10-15",
-        paidDate: "2023-10-12",
-        description: "30% primera fase",
-      },
-      {
-        id: 2,
-        name: "Fase 2",
-        percentage: 30,
-        amount: 6000,
-        status: "Pagada",
-        dueDate: "2024-11-01",
-        paidDate: "2024-10-30",
-        description: "30% segunda fase",
-      },
-      {
-        id: 3,
-        name: "Fase 3",
-        percentage: 40,
-        amount: 8000,
-        status: "Pendiente",
-        dueDate: "2024-12-10",
-        description: "40% fase final",
-      },
-    ],
-    totalPaid: 12000,
-    category: "Integración",
-    priority: "Alta",
-    createdAt: new Date('2023-09-20').toISOString(),
-  },
-  {
-    id: 5,
-    title: "Dashboard Analytics",
-    client: "Digital Ventures",
-    clientId: 5,
-    status: "Planeación",
-    progress: 15,
-    budget: 35000,
-    spent: 5250,
-    deadline: "2025-01-15",
-    startDate: "2023-10-05",
-    team: 3,
-    teamMembers: [
-      { id: 15, name: "Patricia Gil", role: "Data Engineer" },
-      { id: 16, name: "Javier Ortiz", role: "Frontend Developer" },
-      { id: 17, name: "Raquel Mendoza", role: "UX Designer" },
-    ],
-    description: "Dashboard de analytics en tiempo real",
-    paymentMilestones: [
-      {
-        id: 1,
-        name: "Pago Inicial",
-        percentage: 25,
-        amount: 8750,
-        status: "Pendiente",
-        dueDate: "2023-10-20",
-        description: "25% inicial",
-      },
-      {
-        id: 2,
-        name: "Desarrollo Backend",
-        percentage: 35,
-        amount: 12250,
-        status: "Pendiente",
-        dueDate: "2024-11-15",
-        description: "35% backend completo",
-      },
-      {
-        id: 3,
-        name: "Desarrollo Frontend",
-        percentage: 25,
-        amount: 8750,
-        status: "Pendiente",
-        dueDate: "2024-12-20",
-        description: "25% frontend completo",
-      },
-      {
-        id: 4,
-        name: "Entrega Final",
-        percentage: 15,
-        amount: 5250,
-        status: "Pendiente",
-        dueDate: "2025-01-15",
-        description: "15% entrega final",
-      },
-    ],
-    totalPaid: 0,
-    category: "Data Analytics",
-    priority: "Media",
-    createdAt: new Date('2023-10-05').toISOString(),
-  },
-  {
-    id: 6,
-    title: "CRM System",
-    client: "TechCorp Solutions",
-    clientId: 1,
-    status: "En revisión",
-    progress: 85,
-    budget: 55000,
-    spent: 46750,
-    deadline: "2024-11-30",
-    startDate: "2023-07-01",
-    team: 6,
-    teamMembers: [
-      { id: 18, name: "Alberto Sánchez", role: "Tech Lead" },
-      { id: 19, name: "Mónica Reyes", role: "Backend Developer" },
-      { id: 20, name: "Sergio Vargas", role: "Frontend Developer" },
-      { id: 21, name: "Natalia Cruz", role: "UX/UI Designer" },
-      { id: 22, name: "Tomás Flores", role: "QA Lead" },
-      { id: 23, name: "Elena Romero", role: "Scrum Master" },
-    ],
-    description: "Sistema CRM personalizado",
-    paymentMilestones: [
-      {
-        id: 1,
-        name: "Inicio",
-        percentage: 20,
-        amount: 11000,
-        status: "Pagada",
-        dueDate: "2023-07-15",
-        paidDate: "2023-07-10",
-        description: "20% inicio",
-      },
-      {
-        id: 2,
-        name: "Sprint 1-3",
-        percentage: 30,
-        amount: 16500,
-        status: "Pagada",
-        dueDate: "2023-09-30",
-        paidDate: "2023-09-28",
-        description: "30% primeros sprints",
-      },
-      {
-        id: 3,
-        name: "Sprint 4-6",
-        percentage: 30,
-        amount: 16500,
-        status: "Pagada",
-        dueDate: "2024-11-15",
-        paidDate: "2024-11-14",
-        description: "30% sprints intermedios",
-      },
-      {
-        id: 4,
-        name: "Entrega Final",
-        percentage: 20,
-        amount: 11000,
-        status: "Pendiente",
-        dueDate: "2024-12-05",
-        description: "20% entrega final",
-      },
-    ],
-    totalPaid: 44000,
-    category: "Sistema Empresarial",
-    priority: "Alta",
-    createdAt: new Date('2023-07-01').toISOString(),
-  },
-]
+export const useProjectStore = create<ProjectStore>((set, get) => ({
+  projects: [],
+  loading: false,
+  initialized: false,
 
-export const useProjectStore = create<ProjectStore>()(
-  persist(
-    (set, get) => ({
-      projects: initialProjects,
+  fetchProjects: async () => {
+    try {
+      set({ loading: true })
+      const supabase = createClient()
 
-      addProject: (project) =>
-        set((state) => ({
-          projects: [
-            ...state.projects,
-            {
-              ...project,
-              id: Math.max(...state.projects.map((p) => p.id), 0) + 1,
-              createdAt: new Date().toISOString(),
-            },
-          ],
-        })),
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        set({ projects: [], loading: false, initialized: true })
+        return
+      }
 
-      updateProject: (id, updatedProject) =>
-        set((state) => ({
-          projects: state.projects.map((project) =>
-            project.id === id ? { ...project, ...updatedProject } : project
-          ),
-        })),
+      // Fetch projects with client information
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select(`
+          id,
+          title,
+          description,
+          status,
+          priority,
+          category,
+          start_date,
+          deadline,
+          budget,
+          spent,
+          total_paid,
+          progress,
+          created_at,
+          client_id,
+          clients (
+            name
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
 
-      deleteProject: (id) =>
-        set((state) => ({
-          projects: state.projects.filter((project) => project.id !== id),
-        })),
+      if (projectsError) {
+        console.error('Error fetching projects:', {
+          message: projectsError.message,
+          details: projectsError.details,
+          hint: projectsError.hint,
+          code: projectsError.code
+        })
+        throw projectsError
+      }
 
-      updateProjectStatus: (id, status) =>
-        set((state) => ({
-          projects: state.projects.map((project) =>
-            project.id === id ? { ...project, status } : project
-          ),
-        })),
+      // Fetch team members for all projects
+      const { data: teamMembersData, error: teamError } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('user_id', user.id)
 
-      getProjectById: (id) => {
-        return get().projects.find((project) => project.id === id)
-      },
+      if (teamError) {
+        console.error('Error fetching team members:', teamError)
+      }
 
-      getProjectsByStatus: (status) => {
-        return get().projects.filter((project) => project.status === status)
-      },
+      // Fetch payment milestones for all projects
+      const { data: milestonesData, error: milestonesError } = await supabase
+        .from('payment_milestones')
+        .select('*')
+        .eq('user_id', user.id)
 
-      updatePaymentMilestone: (projectId, milestoneId, updates) =>
-        set((state) => ({
-          projects: state.projects.map((project) =>
-            project.id === projectId
-              ? {
-                  ...project,
-                  paymentMilestones: project.paymentMilestones.map((milestone) =>
-                    milestone.id === milestoneId
-                      ? { ...milestone, ...updates }
-                      : milestone
-                  ),
-                }
-              : project
-          ),
-        })),
+      if (milestonesError) {
+        console.error('Error fetching payment milestones:', milestonesError)
+      }
 
-      markMilestoneAsPaid: (projectId, milestoneId, paidDate, invoiceId) =>
-        set((state) => ({
-          projects: state.projects.map((project) => {
-            if (project.id === projectId) {
-              const updatedMilestones = project.paymentMilestones.map((milestone) =>
-                milestone.id === milestoneId
-                  ? {
-                      ...milestone,
-                      status: 'Pagada' as const,
-                      paidDate,
-                      invoiceId,
-                    }
-                  : milestone
-              )
-              const newTotalPaid = updatedMilestones
-                .filter((m) => m.status === 'Pagada')
-                .reduce((sum, m) => sum + m.amount, 0)
+      // Group team members and milestones by project_id
+      const teamMembersByProject = new Map<number, TeamMember[]>()
+      const milestonesByProject = new Map<number, PaymentMilestone[]>()
 
-              return {
-                ...project,
-                paymentMilestones: updatedMilestones,
-                totalPaid: newTotalPaid,
-              }
-            }
-            return project
-          }),
-        })),
-    }),
-    {
-      name: 'project-storage',
+      if (teamMembersData) {
+        teamMembersData.forEach((member: any) => {
+          if (!teamMembersByProject.has(member.project_id)) {
+            teamMembersByProject.set(member.project_id, [])
+          }
+          teamMembersByProject.get(member.project_id)!.push({
+            id: member.id,
+            name: member.name,
+            role: member.role,
+            avatar: member.avatar
+          })
+        })
+      }
+
+      if (milestonesData) {
+        milestonesData.forEach((milestone: any) => {
+          if (!milestonesByProject.has(milestone.project_id)) {
+            milestonesByProject.set(milestone.project_id, [])
+          }
+          milestonesByProject.get(milestone.project_id)!.push({
+            id: milestone.id,
+            name: milestone.name,
+            percentage: milestone.percentage,
+            amount: Number(milestone.amount),
+            status: milestone.status,
+            dueDate: milestone.due_date,
+            paidDate: milestone.paid_date,
+            invoiceId: milestone.invoice_id,
+            description: milestone.description
+          })
+        })
+      }
+
+      // Map database fields to Project type
+      const projects: Project[] = (projectsData || []).map((project: any) => {
+        const teamMembers = teamMembersByProject.get(project.id) || []
+        const paymentMilestones = milestonesByProject.get(project.id) || []
+
+        return {
+          id: project.id,
+          title: project.title,
+          client: project.clients?.name || '',
+          clientId: project.client_id,
+          status: project.status as ProjectStatus,
+          progress: project.progress || 0,
+          budget: Number(project.budget) || 0,
+          spent: Number(project.spent) || 0,
+          deadline: project.deadline,
+          startDate: project.start_date,
+          team: teamMembers.length,
+          teamMembers: teamMembers,
+          description: project.description || '',
+          paymentMilestones: paymentMilestones,
+          totalPaid: Number(project.total_paid) || 0,
+          category: project.category,
+          priority: project.priority as 'Baja' | 'Media' | 'Alta' | undefined,
+          createdAt: project.created_at
+        }
+      })
+
+      set({ projects, loading: false, initialized: true })
+    } catch (error: any) {
+      console.error('Error fetching projects:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
+      set({ loading: false, initialized: true })
     }
-  )
-)
+  },
+
+  addProject: async (project) => {
+    try {
+      set({ loading: true })
+      const supabase = createClient()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      const { data, error } = await supabase
+        .from('projects')
+        .insert([
+          {
+            user_id: user.id,
+            client_id: project.clientId,
+            title: project.title,
+            description: project.description,
+            status: project.status,
+            priority: project.priority,
+            category: project.category,
+            start_date: project.startDate,
+            deadline: project.deadline,
+            budget: project.budget,
+            spent: project.spent || 0,
+            progress: project.progress || 0,
+            total_paid: 0,
+          },
+        ])
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error adding project:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+
+      // Refresh projects to get updated data
+      await get().fetchProjects()
+      set({ loading: false })
+    } catch (error: any) {
+      console.error('Error adding project:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
+      set({ loading: false })
+      throw error
+    }
+  },
+
+  updateProject: async (id, updatedProject) => {
+    try {
+      set({ loading: true })
+      const supabase = createClient()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      const updateData: any = {}
+
+      if (updatedProject.title) updateData.title = updatedProject.title
+      if (updatedProject.description !== undefined) updateData.description = updatedProject.description
+      if (updatedProject.status) updateData.status = updatedProject.status
+      if (updatedProject.priority !== undefined) updateData.priority = updatedProject.priority
+      if (updatedProject.category !== undefined) updateData.category = updatedProject.category
+      if (updatedProject.startDate) updateData.start_date = updatedProject.startDate
+      if (updatedProject.deadline) updateData.deadline = updatedProject.deadline
+      if (updatedProject.budget !== undefined) updateData.budget = updatedProject.budget
+      if (updatedProject.spent !== undefined) updateData.spent = updatedProject.spent
+      if (updatedProject.progress !== undefined) updateData.progress = updatedProject.progress
+      if (updatedProject.clientId) updateData.client_id = updatedProject.clientId
+
+      const { error } = await supabase
+        .from('projects')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (error) {
+        console.error('Error updating project:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+
+      // Refresh projects to get updated data
+      await get().fetchProjects()
+      set({ loading: false })
+    } catch (error: any) {
+      console.error('Error updating project:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
+      set({ loading: false })
+      throw error
+    }
+  },
+
+  deleteProject: async (id) => {
+    try {
+      set({ loading: true })
+      const supabase = createClient()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (error) {
+        console.error('Error deleting project:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+
+      set((state) => ({
+        projects: state.projects.filter((project) => project.id !== id),
+        loading: false
+      }))
+    } catch (error: any) {
+      console.error('Error deleting project:', {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack
+      })
+      set({ loading: false })
+      throw error
+    }
+  },
+
+  updateProjectStatus: async (id, status) => {
+    try {
+      await get().updateProject(id, { status })
+    } catch (error) {
+      throw error
+    }
+  },
+
+  getProjectById: (id) => {
+    return get().projects.find((project) => project.id === id)
+  },
+
+  getProjectsByStatus: (status) => {
+    return get().projects.filter((project) => project.status === status)
+  },
+
+  updatePaymentMilestone: async (projectId, milestoneId, updates) => {
+    try {
+      set({ loading: true })
+      const supabase = createClient()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      const updateData: any = {}
+      if (updates.name) updateData.name = updates.name
+      if (updates.percentage !== undefined) updateData.percentage = updates.percentage
+      if (updates.amount !== undefined) updateData.amount = updates.amount
+      if (updates.status) updateData.status = updates.status
+      if (updates.dueDate !== undefined) updateData.due_date = updates.dueDate
+      if (updates.paidDate !== undefined) updateData.paid_date = updates.paidDate
+      if (updates.invoiceId !== undefined) updateData.invoice_id = updates.invoiceId
+      if (updates.description !== undefined) updateData.description = updates.description
+
+      const { error } = await supabase
+        .from('payment_milestones')
+        .update(updateData)
+        .eq('id', milestoneId)
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+
+      if (error) {
+        console.error('Error updating milestone:', error)
+        throw error
+      }
+
+      // Refresh projects to get updated data
+      await get().fetchProjects()
+      set({ loading: false })
+    } catch (error: any) {
+      console.error('Error updating milestone:', error)
+      set({ loading: false })
+      throw error
+    }
+  },
+
+  markMilestoneAsPaid: async (projectId, milestoneId, paidDate, invoiceId) => {
+    try {
+      await get().updatePaymentMilestone(projectId, milestoneId, {
+        status: 'Pagada',
+        paidDate,
+        invoiceId
+      })
+    } catch (error) {
+      throw error
+    }
+  },
+}))
